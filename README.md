@@ -2,6 +2,8 @@
 
 A minimal, elegant flashcard application built with Next.js, TypeScript, and SQLite. This app implements spaced repetition using the SM-2 algorithm and serves as a teaching tool for learning to use AI coding assistants like Claude Code in VS Code.
 
+> **📖 New here?** See the [Documentation Index](DOCUMENTATION_INDEX.md) for a complete guide to all available documentation.
+
 ## 🎯 Purpose
 
 This application is designed for the AI Capstone course where students will:
@@ -9,6 +11,16 @@ This application is designed for the AI Capstone course where students will:
 2. Use AI assistants to understand and extend an unfamiliar codebase
 3. Practice good development habits (separate Git branches, testing, CI/CD)
 4. Explore educational use cases of LLMs
+
+## 📚 Documentation
+
+**For Students**:
+- **[STUDENT_GUIDE.md](STUDENT_GUIDE.md)** - Comprehensive learning guide with assignments, objectives, and grading rubrics
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Technical development guide and best practices
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Overview of what's been built
+
+**For Instructors**:
+- **[INSTRUCTOR_GUIDE.md](INSTRUCTOR_GUIDE.md)** - Teaching strategies, grading rubrics, and course management
 
 ## 🏗️ Architecture
 
