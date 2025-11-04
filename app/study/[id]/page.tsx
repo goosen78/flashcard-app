@@ -2,8 +2,9 @@ import { getDeck } from '@/lib/selection';
 import { notFound } from 'next/navigation';
 import { StudySession } from './StudySession';
 
-export default function StudyPage({ params }: { params: { id: string } }) {
-  const deck = getDeck(params.id);
+export default async function StudyPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const deck = getDeck(id);
 
   if (!deck) {
     notFound();
@@ -11,7 +12,7 @@ export default function StudyPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <StudySession deckId={params.id} deckName={deck.name} />
+      <StudySession deckId={id} deckName={deck.name} />
     </div>
   );
 }

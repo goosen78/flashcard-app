@@ -4,15 +4,16 @@ import { notFound } from 'next/navigation';
 import { CreateCardForm } from './CreateCardForm';
 import { CardList } from './CardList';
 
-export default function DeckPage({ params }: { params: { id: string } }) {
-  const deck = getDeck(params.id);
+export default async function DeckPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const deck = getDeck(id);
 
   if (!deck) {
     notFound();
   }
 
-  const cards = getCardsForDeck(params.id);
-  const stats = getDeckStats(params.id);
+  const cards = getCardsForDeck(id);
+  const stats = getDeckStats(id);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -54,7 +55,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
 
       <div className="mb-8">
         <h3 className="text-xl font-semibold mb-4">Add Card</h3>
-        <CreateCardForm deckId={params.id} />
+        <CreateCardForm deckId={id} />
       </div>
 
       <div>
