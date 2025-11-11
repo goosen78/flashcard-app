@@ -3,6 +3,7 @@ import { getDeck, getCardsForDeck, getDeckStats } from '@/lib/selection';
 import { notFound } from 'next/navigation';
 import { CreateCardForm } from './CreateCardForm';
 import { CardList } from './CardList';
+import { GenerateCardsForm } from './GenerateCardsForm';
 
 export default async function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,7 +55,12 @@ export default async function DeckPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="mb-8">
-        <h3 className="text-xl font-semibold mb-4">Add Card</h3>
+        <h3 className="text-xl font-semibold mb-4">Generate Cards from Document</h3>
+        <GenerateCardsForm deckId={id} />
+      </div>
+
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold mb-4">Add Card Manually</h3>
         <CreateCardForm deckId={id} />
       </div>
 

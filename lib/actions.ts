@@ -14,6 +14,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, transaction } from '@/db';
 import { sm2Update } from '@/lib/sm2';
 import { selectNextCard, Card, Deck } from '@/lib/selection';
+import { DocumentProcessor, validateDocumentInput, DocumentInput } from '@/lib/document-processor';
+import { OpenAIProvider } from '@/providers/openai';
+import { validateCard, enforceStyle, CandidateCard } from '@/providers/llm';
 
 // ============= DECK ACTIONS =============
 
@@ -222,31 +225,31 @@ export async function submitReview(
     if (quality < 0 || quality > 5) {
       return { success: false, error: 'Quality must be between 0 and 5' };
     }
-    
+
     const result = transaction((db) => {
       // Get current card state
       const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId) as any;
-      
+
       if (!card) {
         throw new Error('Card not found');
       }
-      
+
       // Insert review record
       const reviewId = uuidv4();
       db.prepare(`
         INSERT INTO reviews (id, card_id, quality, latency_ms, user_answer)
         VALUES (?, ?, ?, ?, ?)
       `).run(reviewId, cardId, quality, latencyMs || null, userAnswer || null);
-      
+
       // Update card scheduling using SM-2
       const currentState = {
         e_factor: card.e_factor,
         interval_days: card.interval_days,
         repetition: card.repetition,
       };
-      
+
       const newState = sm2Update(currentState, quality);
-      
+
       db.prepare(`
         UPDATE cards
         SET e_factor = ?,
@@ -262,16 +265,136 @@ export async function submitReview(
         newState.due_at,
         cardId
       );
-      
+
       // Get next card
       const nextCard = selectNextCard(card.deck_id);
-      
+
       return nextCard;
     });
-    
+
     revalidatePath('/');
     return { success: true, nextCard: result };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+// ============= DOCUMENT GENERATION ACTIONS =============
+
+/**
+ * Generate flashcards from uploaded document, URL, or text
+ *
+ * Server Action called from GenerateCardsForm component
+ */
+export async function generateCardsFromDocument(
+  formData: FormData
+): Promise<{
+  success: boolean;
+  cards?: CandidateCard[];
+  error?: string;
+  metadata?: {
+    source: 'pdf' | 'url' | 'text';
+    length: number;
+    truncated: boolean;
+  };
+}> {
+  try {
+    // Parse input type from form
+    const inputType = formData.get('inputType') as 'file' | 'url' | 'text';
+    let documentInput: DocumentInput;
+
+    // Build DocumentInput based on type
+    switch (inputType) {
+      case 'file': {
+        const file = formData.get('file') as File;
+        if (!file || file.size === 0) {
+          return { success: false, error: 'No file provided' };
+        }
+        documentInput = { type: 'file', file };
+        break;
+      }
+
+      case 'url': {
+        const url = formData.get('url') as string;
+        if (!url || url.trim().length === 0) {
+          return { success: false, error: 'No URL provided' };
+        }
+        documentInput = { type: 'url', url: url.trim() };
+        break;
+      }
+
+      case 'text': {
+        const text = formData.get('text') as string;
+        if (!text || text.trim().length === 0) {
+          return { success: false, error: 'No text provided' };
+        }
+        documentInput = { type: 'text', text: text.trim() };
+        break;
+      }
+
+      default:
+        return { success: false, error: 'Invalid input type' };
+    }
+
+    // Validate input before processing
+    const validation = validateDocumentInput(documentInput);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    // Check for OpenAI API key
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'OPENAI_API_KEY not configured. Please add it to your .env file.',
+      };
+    }
+
+    // Process document to markdown
+    const processor = new DocumentProcessor();
+    const processed = await processor.process(documentInput);
+
+    // Generate cards with GPT-4o
+    const provider = new OpenAIProvider(apiKey);
+    const max_cards = parseInt(formData.get('max_cards') as string) || 10;
+    const difficulty = (formData.get('difficulty') as 'easy' | 'medium' | 'hard') || 'medium';
+
+    const rawCards = await provider.generateQuestions(processed.markdown, {
+      max_cards,
+      difficulty,
+    });
+
+    // Validate and clean generated cards
+    const validCards = rawCards
+      .map(enforceStyle)  // Clean whitespace, formatting
+      .filter((card) => {
+        const validation = validateCard(card);
+        if (!validation.valid) {
+          console.warn('Invalid card filtered out:', validation.errors);
+        }
+        return validation.valid;
+      });
+
+    // Check if we got any valid cards
+    if (validCards.length === 0) {
+      return {
+        success: false,
+        error: 'No valid cards generated. Try different content or check document quality.',
+      };
+    }
+
+    // Success!
+    return {
+      success: true,
+      cards: validCards,
+      metadata: processed.metadata,
+    };
+  } catch (error: any) {
+    console.error('Card generation error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to generate cards. Please try again.',
+    };
   }
 }
